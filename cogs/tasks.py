@@ -10,7 +10,7 @@ class MemberCog(commands.Cog):
         super().__init__()
         self.bot = bot
 
-    @commands.slash_command('random-task')
+    @commands.slash_command(name='random-task')
     async def get_random_task(self, inter: disnake.ApplicationCommandInteraction):
         tasks_ids = api.get_tasks_ids()
 
