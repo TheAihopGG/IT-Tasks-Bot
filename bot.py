@@ -1,4 +1,3 @@
-import disnake
 from data.settings import *
 from logging import *
 from disnake.ext import commands
