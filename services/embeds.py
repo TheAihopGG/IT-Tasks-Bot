@@ -1,6 +1,5 @@
 import disnake
 
-
 class Footer(disnake.Embed):
     def __init__(
         self,
