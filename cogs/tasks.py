@@ -12,30 +12,24 @@ class MemberCog(commands.Cog):
         super().__init__()
         self.bot = bot
 
-    @commands.slash_command(name='random-task')
+    @commands.slash_command(name='random-task', description='Returns random task')
     async def get_random_task(self, inter: disnake.ApplicationCommandInteraction):
-        response = requests.get(f"{API_URL}/tasks/ids/")
-        if response.ok:
-            tasks_ids: list[int] = json.loads(response.content)['ids']
-
-            if tasks_ids:
-                response = requests.get(f"{API_URL}/task/", headers={
-                    'body':json.dumps({
-                        'id':random.choice(tasks_ids)
-                    })
-                })
-                if response.ok:
-                    task: TypedTask = json.loads(response.content)['task']
-                    embed = Info()
-                    embed.add_field(task['title'], task['text'])
-                    await inter.response.send_message(embed=embed)
-                
-                else:
-                    await inter.response.send_message(embed=Error(description=f'Request error: {response.content}'))
+        response = requests.get(f'{API_URL}/tasks/ids')
+        match response.status_code:
+            case 200:
+                tasks_ids: list[int] = json.loads(response.content.decode())['ids']
+                response = requests.get(f'{API_URL}/task/?id={random.choice(tasks_ids)}')
+                match response.status_code:
+                    case 200:
+                        task: TypedTask = json.loads(response.content.decode())['task']
+                        await self.send_task(inter, task)
+                    
+                    case _:
+                        await inter.response.send_message(embed=Error(description=response.content))
             
-            else:
-                await inter.response.send_message(embed=Error(description='No tasks available'))
-    
+            case _:
+                await inter.response.send_message(embed=Error(description=response.content))
+
     @commands.slash_command(
         name='get-task',
         description='Returns task or task with id or tags'
@@ -47,44 +41,42 @@ class MemberCog(commands.Cog):
         tags: str | None = None
     ):
         if id:
-            response = requests.get(f"{API_URL}/task/", headers={
-                'body':json.dumps({
-                    'id':id
-                })
-            })
-            if response.ok:
-                task: TypedTask = json.loads(response.content)['task']
-                embed = Info()
-                embed.add_field(task['title'], task['text'])
-                await inter.response.send_message(embed=embed)
-            
-            elif response.status_code == 404:
-                await inter.response.send_message(embed=Error(description=f'Task has not found with this id: {id}'))
-            
-            else:
-                await inter.response.send_message(embed=Error(description=f'Unknown request error'))
+            response = requests.get(f"{API_URL}/task/?id={id}")
+            match response.status_code:
+                case 200:
+                    task: TypedTask = json.loads(response.content)['task']
+                    await self.send_task(inter, task)
+
+                case 404:
+                    await inter.response.send_message(embed=Error(description=f'Task has not found with this id: {id}'))
+
+                case _:
+                    await inter.response.send_message(embed=Error(description=f'Unknown request error'))
         
         elif tags:
-            response = requests.get(f"{API_URL}/tasks/by_tags", headers={
-                'body':json.dumps({
-                    'tags':tags.replace(' ', '').split(',') # delete spaces and split by ,
-                })
-            })
-            if response.ok:
-                tasks: list[TypedTask] = json.loads(response.content)['tasks']
-                embed = Info(description=f'Founded {len(tasks)} tasks with tags: {tags}')
-                [embed.add_field(task['title'], task['text'], inline=False) for task in tasks]
-                await inter.response.send_message(embed=embed)
-            
-            elif response.status_code == 404:
-                await inter.response.send_message(embed=Error(description=f'Tasks have not found with these tags: {tags}'))
-            
-            else:
-                await inter.response.send_message(embed=Error(description=f'Unknown request error'))
+            response = requests.get(f"{API_URL}/tasks/by_tags/?tags={tags}")
+            match response.status_code:
+                case 200:
+                    tasks: list[TypedTask] = json.loads(response.content)['tasks']
+                    embed = Info(description=f'Founded {len(tasks)} tasks with tags: {tags}')
+                    [embed.add_field(task['title'], task['task'], inline=False) for task in tasks]
+                    await inter.response.send_message(embed=embed)
+
+                case 404:
+                    await inter.response.send_message(embed=Error(description=f'Tasks have not found with these tags: {tags}'))
+
+                case _:
+                    await inter.response.send_message(embed=Error(description=f'Unknown request error'))
         
         else:
             await inter.response.send_message(embed=Error(description=f'YUou must pass at least 1 parameter'))
 
+    async def send_task(self, inter: disnake.AppCommandInteraction, task: TypedTask, /):
+        embed = Info()
+        embed.set_image(task['image_url'])
+        embed.add_field(task['title'], task['topic'], inline=False)
+        embed.add_field('Task', task['task'], inline=False)
+        await inter.response.send_message(embed=embed)
 
 def setup(bot: commands.Bot):
     bot.add_cog(MemberCog(bot))
