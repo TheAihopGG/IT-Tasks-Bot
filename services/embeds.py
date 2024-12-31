@@ -47,14 +47,3 @@ class Info(Footer):
     ):
         super().__init__(title=title, description=description, footer_text=footer_text, **kwargs)
         self.color = disnake.Color.blue()
-
-
-class AdminPerError(Error):
-    def __init__(
-        self,
-        title = 'Error',
-        description = 'You need to have administrator rights to run this command.',
-        footer_text = '',
-        **kwargs
-    ):
-        super().__init__(title, description, footer_text, **kwargs)
